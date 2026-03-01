@@ -139,7 +139,7 @@ func (s *FulfillmentService) CreateManual(input CreateManualInput) (*models.Fulf
 				"target_status", constants.OrderStatusDelivered,
 				"error", syncErr,
 			)
-		} else if s.queueClient != nil {
+		} else if s.queueClient != nil && s.queueClient.Enabled() {
 			if status == "" {
 				status = constants.OrderStatusDelivered
 			}
@@ -152,7 +152,7 @@ func (s *FulfillmentService) CreateManual(input CreateManualInput) (*models.Fulf
 				)
 			}
 		}
-	} else if s.queueClient != nil {
+	} else if s.queueClient != nil && s.queueClient.Enabled() {
 		if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, input.OrderID, constants.OrderStatusDelivered); err != nil {
 			logger.Warnw("fulfillment_enqueue_status_email_failed",
 				"order_id", order.ID,
@@ -320,7 +320,7 @@ func (s *FulfillmentService) CreateAuto(orderID uint) (*models.Fulfillment, erro
 				"target_status", constants.OrderStatusCompleted,
 				"error", syncErr,
 			)
-		} else if s.queueClient != nil {
+		} else if s.queueClient != nil && s.queueClient.Enabled() {
 			if status == "" {
 				status = constants.OrderStatusCompleted
 			}
@@ -333,7 +333,7 @@ func (s *FulfillmentService) CreateAuto(orderID uint) (*models.Fulfillment, erro
 				)
 			}
 		}
-	} else if s.queueClient != nil {
+	} else if s.queueClient != nil && s.queueClient.Enabled() {
 		if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, orderID, constants.OrderStatusCompleted); err != nil {
 			logger.Warnw("fulfillment_enqueue_status_email_failed",
 				"order_id", order.ID,
