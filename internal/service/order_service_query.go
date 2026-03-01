@@ -100,6 +100,11 @@ func (s *OrderService) GetOrderByGuest(orderID uint, email, password string) (*m
 	if order == nil {
 		return nil, ErrGuestOrderNotFound
 	}
+	// CIS 5.2 / PCI-DSS 6.5.10 — reject over-long passwords before bcrypt to prevent
+	// the library's 72-byte truncation from falsely matching a different long password.
+	if len(password) > BcryptMaxPasswordBytes {
+		return nil, ErrGuestOrderNotFound
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(order.GuestPassword), []byte(password)); err != nil {
 		return nil, ErrGuestOrderNotFound
 	}
@@ -117,6 +122,10 @@ func (s *OrderService) GetOrderByGuestOrderNo(orderNo, email, password string) (
 		return nil, ErrOrderFetchFailed
 	}
 	if order == nil {
+		return nil, ErrGuestOrderNotFound
+	}
+	// CIS 5.2 / PCI-DSS 6.5.10 — reject over-long passwords before bcrypt.
+	if len(password) > BcryptMaxPasswordBytes {
 		return nil, ErrGuestOrderNotFound
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(order.GuestPassword), []byte(password)); err != nil {
@@ -147,6 +156,12 @@ func (s *OrderService) ListOrdersByUser(filter repository.OrderListFilter) ([]mo
 
 // ListOrdersByGuest 获取游客订单列表
 func (s *OrderService) ListOrdersByGuest(email, password string, page, pageSize int) ([]models.Order, int64, error) {
+	// CIS 5.2 / PCI-DSS 6.5.10 — reject over-long passwords before bcrypt.
+	// An empty result is indistinguishable from "no orders found", preventing
+	// information leakage about the existence of orders for this email.
+	if len(password) > BcryptMaxPasswordBytes {
+		return nil, 0, nil
+	}
 	orders, _, err := s.orderRepo.ListByGuest(email, page, pageSize)
 	if err != nil {
 		return nil, 0, ErrOrderFetchFailed

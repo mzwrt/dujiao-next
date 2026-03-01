@@ -149,6 +149,12 @@ func (s *OrderService) CreateGuestOrder(input CreateGuestOrderInput) (*models.Or
 	if password == "" {
 		return nil, ErrGuestPasswordRequired
 	}
+	// CIS 5.2 / PCI-DSS 6.5.10 — bcrypt silently truncates inputs longer than 72 bytes,
+	// which can cause two distinct passwords to hash identically and enable authentication
+	// bypass. Reject passwords exceeding the limit before calling bcrypt.
+	if len(password) > BcryptMaxPasswordBytes {
+		return nil, ErrWeakPassword
+	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
