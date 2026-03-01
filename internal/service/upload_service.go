@@ -216,7 +216,15 @@ func decodeWebPDimensions(src io.ReadSeeker) (int, int, error) {
 		return 0, 0, fmt.Errorf("无效的 WebP 文件头")
 	}
 
-	const maxWebPChunkSize = 100 << 20 // 100 MB — 防止恶意文件触发超大内存分配 (DoS)
+	// maxWebPChunkSize is the per-chunk size limit. Chunks larger than this are
+	// rejected immediately. CIS 5.2 / PCI-DSS 6.5.10 — prevents exhausting memory
+	// through a crafted large chunk-size field (DoS). The guard is applied at line 234.
+	const maxWebPChunkSize = 100 << 20 // 100 MB
+
+	// dimBuf is a 10-byte stack buffer shared across all dimension chunk reads.
+	// VP8X and VP8 need 10 bytes; VP8L needs 5. Using a fixed-size stack array
+	// instead of make([]byte, chunkSize) eliminates heap allocations for parsing.
+	var dimBuf [10]byte
 
 	for {
 		chunkHeader := make([]byte, 8)
@@ -229,38 +237,66 @@ func decodeWebPDimensions(src io.ReadSeeker) (int, int, error) {
 			return 0, 0, fmt.Errorf("无效的 WebP chunk")
 		}
 
-		data := make([]byte, chunkSize)
-		if _, err := io.ReadFull(src, data); err != nil {
-			return 0, 0, err
-		}
-
-		if chunkType == "VP8X" {
-			if len(data) < 10 {
+		switch chunkType {
+		case "VP8X":
+			if chunkSize < 10 {
 				return 0, 0, fmt.Errorf("VP8X chunk 长度不足")
 			}
-			width := 1 + int(data[4]) + int(data[5])<<8 + int(data[6])<<16
-			height := 1 + int(data[7]) + int(data[8])<<8 + int(data[9])<<16
+			// 仅读取维度所需的 10 字节，通过 Seek 跳过其余部分，避免堆分配大缓冲区。
+			if _, err := io.ReadFull(src, dimBuf[:]); err != nil {
+				return 0, 0, err
+			}
+			if chunkSize > 10 {
+				if _, err := src.Seek(int64(chunkSize-10), io.SeekCurrent); err != nil {
+					return 0, 0, err
+				}
+			}
+			width := 1 + int(dimBuf[4]) + int(dimBuf[5])<<8 + int(dimBuf[6])<<16
+			height := 1 + int(dimBuf[7]) + int(dimBuf[8])<<8 + int(dimBuf[9])<<16
 			return width, height, nil
-		}
-		if chunkType == "VP8 " {
-			if len(data) < 10 {
+
+		case "VP8 ":
+			if chunkSize < 10 {
 				return 0, 0, fmt.Errorf("VP8 chunk 长度不足")
 			}
-			width := int(binary.LittleEndian.Uint16(data[6:8]) & 0x3FFF)
-			height := int(binary.LittleEndian.Uint16(data[8:10]) & 0x3FFF)
+			if _, err := io.ReadFull(src, dimBuf[:]); err != nil {
+				return 0, 0, err
+			}
+			if chunkSize > 10 {
+				if _, err := src.Seek(int64(chunkSize-10), io.SeekCurrent); err != nil {
+					return 0, 0, err
+				}
+			}
+			width := int(binary.LittleEndian.Uint16(dimBuf[6:8]) & 0x3FFF)
+			height := int(binary.LittleEndian.Uint16(dimBuf[8:10]) & 0x3FFF)
 			return width, height, nil
-		}
-		if chunkType == "VP8L" {
-			if len(data) < 5 {
+
+		case "VP8L":
+			if chunkSize < 5 {
 				return 0, 0, fmt.Errorf("VP8L chunk 长度不足")
 			}
-			if data[0] != 0x2f {
+			// VP8L 仅需前 5 字节（签名 + 维度位流）。
+			if _, err := io.ReadFull(src, dimBuf[:5]); err != nil {
+				return 0, 0, err
+			}
+			if chunkSize > 5 {
+				if _, err := src.Seek(int64(chunkSize-5), io.SeekCurrent); err != nil {
+					return 0, 0, err
+				}
+			}
+			if dimBuf[0] != 0x2f {
 				return 0, 0, fmt.Errorf("VP8L 签名无效")
 			}
-			bits := binary.LittleEndian.Uint32(data[1:5])
+			bits := binary.LittleEndian.Uint32(dimBuf[1:5])
 			width := int(bits&0x3FFF) + 1
 			height := int((bits>>14)&0x3FFF) + 1
 			return width, height, nil
+
+		default:
+			// 非维度 chunk — 通过 Seek 跳过，完全不分配内存（CIS 5.2 / PCI-DSS 6.5.10）。
+			if _, err := src.Seek(int64(chunkSize), io.SeekCurrent); err != nil {
+				return 0, 0, err
+			}
 		}
 
 		if chunkSize%2 == 1 {

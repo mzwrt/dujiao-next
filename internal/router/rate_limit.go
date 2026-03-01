@@ -9,6 +9,7 @@ import (
 
 	"github.com/mzwrt/dujiao-next/internal/http/response"
 	"github.com/mzwrt/dujiao-next/internal/i18n"
+	"github.com/mzwrt/dujiao-next/internal/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -66,24 +67,35 @@ func RateLimitMiddleware(client *redis.Client, rule RateLimitRule, keyFunc RateL
 			rule.BlockSeconds,
 		).Result()
 		if err != nil {
-			msg := i18n.T(i18n.ResolveLocale(c), "error.rate_limit_unavailable")
-			response.Error(c, response.CodeInternal, msg)
-			c.Abort()
+			// Redis 不可用时降级放行请求 — 限流是纵深防御措施，Redis 故障不应
+			// 成为可用性瓶颈（CIS 5.2 / PCI-DSS 6.5.10 — 防止级联 DoS）。
+			// Fail open when Redis is unavailable: rate limiting is a defence-in-depth
+			// measure, not an authoritative access control gate. Redis failure must not
+			// cascade into a full service outage for legitimate users.
+			logger.Warnw("rate_limit_redis_unavailable",
+				"key", key,
+				"error", err,
+			)
+			c.Next()
 			return
 		}
 
 		values, ok := result.([]interface{})
 		if !ok || len(values) < 2 {
-			msg := i18n.T(i18n.ResolveLocale(c), "error.rate_limit_unavailable")
-			response.Error(c, response.CodeInternal, msg)
-			c.Abort()
+			logger.Warnw("rate_limit_redis_unexpected_result",
+				"key", key,
+				"result", result,
+			)
+			c.Next()
 			return
 		}
 		count, ok := toInt64(values[0])
 		if !ok {
-			msg := i18n.T(i18n.ResolveLocale(c), "error.rate_limit_unavailable")
-			response.Error(c, response.CodeInternal, msg)
-			c.Abort()
+			logger.Warnw("rate_limit_redis_count_invalid",
+				"key", key,
+				"value", values[0],
+			)
+			c.Next()
 			return
 		}
 		ttlSeconds, _ := toInt64(values[1])

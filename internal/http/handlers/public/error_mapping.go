@@ -77,6 +77,10 @@ var guestOrderCommonErrorRules = []mappedHandlerError{
 	{target: service.ErrProductSKUInvalid, code: response.CodeBadRequest, key: "error.order_item_invalid"},
 	{target: service.ErrGuestEmailRequired, code: response.CodeBadRequest, key: "error.guest_email_required"},
 	{target: service.ErrGuestPasswordRequired, code: response.CodeBadRequest, key: "error.guest_password_required"},
+	// ErrWeakPassword is returned when the guest order password exceeds bcrypt's 72-byte
+	// limit (CIS 5.2 / PCI-DSS 6.5.10). Map it to the same 400 error key so users
+	// know the password is unacceptable without revealing the internal check detail.
+	{target: service.ErrWeakPassword, code: response.CodeBadRequest, key: "error.guest_password_required"},
 	{target: service.ErrInvalidEmail, code: response.CodeBadRequest, key: "error.email_invalid"},
 	{target: service.ErrProductPurchaseNotAllowed, code: response.CodeBadRequest, key: "error.product_purchase_not_allowed"},
 	{target: service.ErrGuestCouponNotAllowed, code: response.CodeBadRequest, key: "error.guest_coupon_not_allowed"},

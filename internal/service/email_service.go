@@ -246,7 +246,12 @@ func sanitizeEmailHeader(value string) string {
 }
 
 func sendMailWithSSL(addr string, auth smtp.Auth, host, from string, to []string, msg []byte) error {
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: host})
+	// PCI-DSS 4.0 — explicitly enforce TLS 1.2+ minimum; mirrors MinVersion set
+	// in the Redis and queue TLS configs throughout this codebase.
+	conn, err := tls.Dial("tcp", addr, &tls.Config{
+		ServerName: host,
+		MinVersion: tls.VersionTLS12,
+	})
 	if err != nil {
 		return err
 	}
@@ -295,7 +300,11 @@ func sendMailWithStartTLS(addr string, auth smtp.Auth, host, from string, to []s
 	}
 	defer client.Close()
 
-	if err := client.StartTLS(&tls.Config{ServerName: host}); err != nil {
+	// PCI-DSS 4.0 — explicitly enforce TLS 1.2+ minimum on the STARTTLS upgrade.
+	if err := client.StartTLS(&tls.Config{
+		ServerName: host,
+		MinVersion: tls.VersionTLS12,
+	}); err != nil {
 		return err
 	}
 
