@@ -157,6 +157,7 @@ WHERE id = ? AND (usage_limit = 0 OR used_count + 1 <= usage_limit)
 | 第 19 轮 | 5-agent 并行深度审查 + CodeQL | 3 中-高 | 3 ✅ | 0 |
 | 第 20 轮 | CIS/PCI-DSS 全量复审（TLS MinVersion/NGINX限流/CORS/配置加固） | 8 低-中 | 8 ✅ | 0 |
 | 第 22 轮 | 可用性/限流级联 DoS 防护 | 1 中 | 1 ✅ | 0 |
+| 第 23 轮 | WebP 解析内存 DoS / 全量复审 | 1 中 | 1 ✅ | 0 |
 
 **最终结论：所有发现的安全问题已修复，未发现未修复的高危或严重安全漏洞。**
 
@@ -212,6 +213,7 @@ WHERE id = ? AND (usage_limit = 0 OR used_count + 1 <= usage_limit)
 | 46 | 低 | Vite 开发服务器监听 0.0.0.0 暴露至网络 (CIS 网络安全) | `user/vite.config.ts` / `admin/vite.config.ts` 改为 `localhost` |
 | 47 | 低 | 配置模板缺少 Redis 密码和 TLS 安全注释 | `config.yml.example` 添加 PCI-DSS 合规注释 |
 | 48 | 中 | 限流中间件 Redis 不可用时返回 HTTP 500，导致级联 DoS (CIS 5.2 / PCI-DSS 6.5.10) | `rate_limit.go` Redis 脚本执行失败时降级放行（fail-open），记录 Warn 日志，避免 Redis 故障引发应用不可用 |
+| 49 | 中 | WebP 解析对非维度 chunk 使用 `make([]byte, chunkSize)` 分配最多 100 MB 堆内存，高并发时可能耗尽内存（DoS，CIS 5.2 / PCI-DSS 6.5.10） | `upload_service.go` 改用 `io.Seek` 跳过非维度 chunk；维度 chunk 仅读取所需最小字节（10 字节），消除堆分配风险；新增 6 个单元测试覆盖全路径 |
 
 残留低风险项（设计决策/行业通用做法，风险可控）：
 1. `v-html` 使用 — 内容来源为管理后台（已认证 + RBAC），非用户输入
@@ -232,8 +234,8 @@ WHERE id = ? AND (usage_limit = 0 OR used_count + 1 <= usage_limit)
 ## 审查声明
 
 - 审查日期：2026-03-01
-- 审查轮次：22 轮完整审查（5 轮初审 + 5 轮深度复查 + 2 轮 CIS/PCI-DSS 合规深度审查 + 5 轮全量终审 + 1 轮最终安全加固 + 1 轮 5-agent 并行深度审查 + 1 轮 PCI-DSS 4.1 合规加固 + 1 轮 CIS/PCI-DSS 全量复审 + 1 轮可用性/限流防护）
-- 审查范围：全部 Go API 源代码（211+ 个 .go 生产文件、47 个测试文件）、Vue 3 前端源代码（User + Admin）、Docker/NGINX 配置、支付集成（7 种支付渠道）
-- 审查方法：人工代码审查 × 22 轮 + 5-agent 并行深度审查 + 自动化测试（go test 17 套件全部通过）+ go vet 静态分析 + CodeQL 安全扫描（0 alerts）× 5
-- 已修复：14 个高危问题 + 24 个中危问题 + 10 个低危问题（共 48 项）
+- 审查轮次：23 轮完整审查（5 轮初审 + 5 轮深度复查 + 2 轮 CIS/PCI-DSS 合规深度审查 + 5 轮全量终审 + 1 轮最终安全加固 + 1 轮 5-agent 并行深度审查 + 1 轮 PCI-DSS 4.1 合规加固 + 1 轮 CIS/PCI-DSS 全量复审 + 1 轮可用性/限流防护 + 1 轮 WebP 解析 DoS 修复）
+- 审查范围：全部 Go API 源代码（211+ 个 .go 生产文件、48 个测试文件）、Vue 3 前端源代码（User + Admin）、Docker/NGINX 配置、支付集成（7 种支付渠道）
+- 审查方法：人工代码审查 × 23 轮 + 5-agent 并行深度审查 + 自动化测试（go test 17 套件全部通过）+ go vet 静态分析 + CodeQL 安全扫描（0 alerts）× 5
+- 已修复：14 个高危问题 + 25 个中危问题 + 10 个低危问题（共 49 项）
 - 结论：**所有发现的安全问题已修复，未发现未修复的高危漏洞**
