@@ -569,7 +569,7 @@ func (s *PaymentService) CreateWalletRechargePayment(input CreateWalletRechargeP
 		})
 		return nil, err
 	}
-	if s.queueClient != nil {
+	if s.queueClient != nil && s.queueClient.Enabled() {
 		delay := time.Duration(s.resolveExpireMinutes()) * time.Minute
 		if err := s.queueClient.EnqueueWalletRechargeExpire(queue.WalletRechargeExpirePayload{
 			PaymentID: payment.ID,

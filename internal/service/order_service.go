@@ -291,9 +291,6 @@ func (s *OrderService) previewOrder(input orderCreateParams) (*OrderPreview, err
 }
 
 func (s *OrderService) createOrder(input orderCreateParams) (*models.Order, error) {
-	if s.queueClient == nil || !s.queueClient.Enabled() {
-		return nil, ErrQueueUnavailable
-	}
 	result, err := s.buildOrderResult(input)
 	if err != nil {
 		return nil, err
@@ -474,7 +471,7 @@ func (s *OrderService) createOrder(input orderCreateParams) (*models.Order, erro
 		return nil, ErrOrderCreateFailed
 	}
 
-	if s.queueClient != nil {
+	if s.queueClient != nil && s.queueClient.Enabled() {
 		if err := s.queueClient.EnqueueOrderTimeoutCancel(queue.OrderTimeoutCancelPayload{
 			OrderID: order.ID,
 		}, time.Duration(expireMinutes)*time.Minute); err != nil {
