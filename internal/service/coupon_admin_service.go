@@ -69,11 +69,11 @@ func (s *CouponAdminService) Create(input CreateCouponInput) (*models.Coupon, er
 		return nil, ErrCouponInvalid
 	}
 
-	exist, err := s.repo.GetByCode(code)
+	exist, err := s.repo.ExistsByCode(code)
 	if err != nil {
 		return nil, err
 	}
-	if exist != nil {
+	if exist {
 		return nil, ErrCouponInvalid
 	}
 
@@ -142,11 +142,11 @@ func (s *CouponAdminService) Update(id uint, input UpdateCouponInput) (*models.C
 	}
 
 	if code != existing.Code {
-		dup, err := s.repo.GetByCode(code)
+		dup, err := s.repo.ExistsByCode(code)
 		if err != nil {
 			return nil, err
 		}
-		if dup != nil {
+		if dup {
 			return nil, ErrCouponInvalid
 		}
 	}

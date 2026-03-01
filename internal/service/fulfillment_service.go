@@ -130,38 +130,36 @@ func (s *FulfillmentService) CreateManual(input CreateManualInput) (*models.Fulf
 		}
 		return nil, ErrFulfillmentCreateFailed
 	}
-	if s.queueClient != nil {
-		if order.ParentID != nil {
-			status, syncErr := syncParentStatus(s.orderRepo, *order.ParentID, now)
-			if syncErr != nil {
-				logger.Warnw("fulfillment_sync_parent_status_failed",
-					"order_id", order.ID,
-					"parent_order_id", *order.ParentID,
-					"target_status", constants.OrderStatusDelivered,
-					"error", syncErr,
-				)
-			} else {
-				if status == "" {
-					status = constants.OrderStatusDelivered
-				}
-				if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, *order.ParentID, status); err != nil {
-					logger.Warnw("fulfillment_enqueue_status_email_failed",
-						"order_id", order.ID,
-						"target_order_id", *order.ParentID,
-						"status", status,
-						"error", err,
-					)
-				}
+	if order.ParentID != nil {
+		status, syncErr := syncParentStatus(s.orderRepo, *order.ParentID, now)
+		if syncErr != nil {
+			logger.Warnw("fulfillment_sync_parent_status_failed",
+				"order_id", order.ID,
+				"parent_order_id", *order.ParentID,
+				"target_status", constants.OrderStatusDelivered,
+				"error", syncErr,
+			)
+		} else if s.queueClient != nil && s.queueClient.Enabled() {
+			if status == "" {
+				status = constants.OrderStatusDelivered
 			}
-		} else {
-			if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, input.OrderID, constants.OrderStatusDelivered); err != nil {
+			if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, *order.ParentID, status); err != nil {
 				logger.Warnw("fulfillment_enqueue_status_email_failed",
 					"order_id", order.ID,
-					"target_order_id", input.OrderID,
-					"status", constants.OrderStatusDelivered,
+					"target_order_id", *order.ParentID,
+					"status", status,
 					"error", err,
 				)
 			}
+		}
+	} else if s.queueClient != nil && s.queueClient.Enabled() {
+		if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, input.OrderID, constants.OrderStatusDelivered); err != nil {
+			logger.Warnw("fulfillment_enqueue_status_email_failed",
+				"order_id", order.ID,
+				"target_order_id", input.OrderID,
+				"status", constants.OrderStatusDelivered,
+				"error", err,
+			)
 		}
 	}
 	return created, nil
@@ -313,38 +311,36 @@ func (s *FulfillmentService) CreateAuto(orderID uint) (*models.Fulfillment, erro
 			return nil, ErrFulfillmentCreateFailed
 		}
 	}
-	if s.queueClient != nil {
-		if order.ParentID != nil {
-			status, syncErr := syncParentStatus(s.orderRepo, *order.ParentID, now)
-			if syncErr != nil {
-				logger.Warnw("fulfillment_sync_parent_status_failed",
-					"order_id", order.ID,
-					"parent_order_id", *order.ParentID,
-					"target_status", constants.OrderStatusCompleted,
-					"error", syncErr,
-				)
-			} else {
-				if status == "" {
-					status = constants.OrderStatusCompleted
-				}
-				if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, *order.ParentID, status); err != nil {
-					logger.Warnw("fulfillment_enqueue_status_email_failed",
-						"order_id", order.ID,
-						"target_order_id", *order.ParentID,
-						"status", status,
-						"error", err,
-					)
-				}
+	if order.ParentID != nil {
+		status, syncErr := syncParentStatus(s.orderRepo, *order.ParentID, now)
+		if syncErr != nil {
+			logger.Warnw("fulfillment_sync_parent_status_failed",
+				"order_id", order.ID,
+				"parent_order_id", *order.ParentID,
+				"target_status", constants.OrderStatusCompleted,
+				"error", syncErr,
+			)
+		} else if s.queueClient != nil && s.queueClient.Enabled() {
+			if status == "" {
+				status = constants.OrderStatusCompleted
 			}
-		} else {
-			if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, orderID, constants.OrderStatusCompleted); err != nil {
+			if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, *order.ParentID, status); err != nil {
 				logger.Warnw("fulfillment_enqueue_status_email_failed",
 					"order_id", order.ID,
-					"target_order_id", orderID,
-					"status", constants.OrderStatusCompleted,
+					"target_order_id", *order.ParentID,
+					"status", status,
 					"error", err,
 				)
 			}
+		}
+	} else if s.queueClient != nil && s.queueClient.Enabled() {
+		if _, err := enqueueOrderStatusEmailTaskIfEligible(s.orderRepo, s.queueClient, orderID, constants.OrderStatusCompleted); err != nil {
+			logger.Warnw("fulfillment_enqueue_status_email_failed",
+				"order_id", order.ID,
+				"target_order_id", orderID,
+				"status", constants.OrderStatusCompleted,
+				"error", err,
+			)
 		}
 	}
 	return fulfillment, nil
