@@ -16,6 +16,7 @@ var ErrCouponUsageLimitExceeded = errors.New("coupon usage limit exceeded")
 type CouponRepository interface {
 	GetByID(id uint) (*models.Coupon, error)
 	GetByCode(code string) (*models.Coupon, error)
+	ExistsByCode(code string) (bool, error)
 	ListByIDs(ids []uint) ([]models.Coupon, error)
 	Create(coupon *models.Coupon) error
 	Update(coupon *models.Coupon) error
@@ -66,7 +67,7 @@ func (r *GormCouponRepository) GetByID(id uint) (*models.Coupon, error) {
 	return &coupon, nil
 }
 
-// GetByCode 根据优惠码获取优惠券
+// GetByCode 根据优惠码获取优惠券（不含软删除记录）
 func (r *GormCouponRepository) GetByCode(code string) (*models.Coupon, error) {
 	var coupon models.Coupon
 	if err := r.db.Where("code = ?", code).First(&coupon).Error; err != nil {
@@ -76,6 +77,15 @@ func (r *GormCouponRepository) GetByCode(code string) (*models.Coupon, error) {
 		return nil, err
 	}
 	return &coupon, nil
+}
+
+// ExistsByCode 检查优惠码是否已存在（含软删除记录，用于创建/更新前的唯一性检测）
+func (r *GormCouponRepository) ExistsByCode(code string) (bool, error) {
+	var count int64
+	if err := r.db.Unscoped().Model(&models.Coupon{}).Where("code = ?", code).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // ListByIDs 批量获取优惠券
