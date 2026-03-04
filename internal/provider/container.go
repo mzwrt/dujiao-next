@@ -1,6 +1,9 @@
 package provider
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/mzwrt/dujiao-next/internal/authz"
 	"github.com/mzwrt/dujiao-next/internal/cache"
 	"github.com/mzwrt/dujiao-next/internal/config"
@@ -77,7 +80,8 @@ type Container struct {
 func NewContainer(cfg *config.Config) *Container {
 	// 初始化缓存
 	if err := cache.InitRedis(&cfg.Redis); err != nil {
-		logger.Warnw("provider_init_redis_failed", "error", err)
+		logger.Errorw("provider_init_redis_failed", "error", err)
+		fmt.Fprintf(os.Stderr, "错误: Redis 初始化失败: %v\n", err)
 	}
 
 	// 初始化队列客户端
