@@ -309,7 +309,7 @@ func (s *AffiliateService) TrackClick(input AffiliateTrackClickInput) error {
 		LandingPath:        landingPath,
 		Referrer:           strings.TrimSpace(input.Referrer),
 		ClientIP:           strings.TrimSpace(input.ClientIP),
-		UserAgent:          strings.TrimSpace(input.UserAgent),
+		UserAgent:          truncateUserAgent(input.UserAgent),
 		CreatedAt:          time.Now(),
 	}
 	return s.repo.CreateClick(click)
