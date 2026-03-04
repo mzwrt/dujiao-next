@@ -19,10 +19,17 @@ func InitDefaultAdmin(username, password string) error {
 		return fmt.Errorf("count admins failed: %w", err)
 	}
 
-	// 如果已有管理员，确保默认 admin 拥有超级管理员权限
+	// 如果已有管理员，确保首次初始化的管理员拥有超级管理员权限
 	if count > 0 {
 		if err := DB.Model(&Admin{}).Where("username = ?", "admin").Update("is_super", true).Error; err != nil {
 			logger.Warnw("ensure_default_admin_super_failed", "error", err)
+		}
+		// 如果配置了自定义用户名，同样确保其拥有超级管理员权限（修复非 "admin" 用户名场景）
+		trimmedUsername := strings.TrimSpace(username)
+		if trimmedUsername != "" && !strings.EqualFold(trimmedUsername, "admin") {
+			if err := DB.Model(&Admin{}).Where("username = ?", trimmedUsername).Update("is_super", true).Error; err != nil {
+				logger.Warnw("ensure_custom_admin_super_failed", "username", trimmedUsername, "error", err)
+			}
 		}
 		return nil
 	}
@@ -48,7 +55,7 @@ func InitDefaultAdmin(username, password string) error {
 	admin := Admin{
 		Username:     username,
 		PasswordHash: string(hash),
-		IsSuper:      strings.EqualFold(strings.TrimSpace(username), "admin"),
+		IsSuper:      true, // 首次引导创建的管理员始终是超级管理员
 	}
 
 	if err := DB.Create(&admin).Error; err != nil {
