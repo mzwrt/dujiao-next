@@ -178,6 +178,10 @@ func (s *CaptchaService) verifyTurnstile(cfg CaptchaTurnstileSetting, token, cli
 	if secret == "" || verifyURL == "" {
 		return ErrCaptchaConfigInvalid
 	}
+	// PCI-DSS 6.5.9 — 纵深防御：确保 verifyURL 使用 HTTPS，防止 SSRF 将凭证发送到非 TLS 端点。
+	if !strings.HasPrefix(verifyURL, "https://") {
+		return ErrCaptchaConfigInvalid
+	}
 
 	timeout := cfg.TimeoutMS
 	if timeout < 500 || timeout > 10000 {
