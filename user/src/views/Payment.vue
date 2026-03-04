@@ -806,7 +806,10 @@ const loadOrder = async (options?: { silent?: boolean }) => {
     if (!silent) {
       order.value = null
       if (isGuest.value) {
-        guestAuthError.value = t('payment.guestAuthInvalid')
+        const isBusinessError = err != null && typeof err === 'object' && 'silentBusinessError' in (err as object)
+        guestAuthError.value = isBusinessError
+          ? t('payment.guestAuthInvalid')
+          : (err instanceof Error ? err.message : t('payment.guestAuthInvalid'))
       }
     }
   } finally {
@@ -1238,7 +1241,7 @@ const channelTypeLabel = (value?: string) => {
 
 onMounted(() => {
   if (!orderNoQuery.value) return
-  const saved = localStorage.getItem('guest_order_auth')
+  const saved = sessionStorage.getItem('guest_order_auth')
   let savedAuth: Record<string, unknown> = {}
   try {
     savedAuth = saved ? JSON.parse(saved) : {}
@@ -1323,7 +1326,7 @@ const handleGuestAuthSubmit = async () => {
     guestAuthError.value = t('payment.guestAuthRequired')
     return
   }
-  localStorage.setItem('guest_order_auth', JSON.stringify({
+  sessionStorage.setItem('guest_order_auth', JSON.stringify({
     email: guestAuth.value.email,
     order_password: guestAuth.value.order_password,
   }))

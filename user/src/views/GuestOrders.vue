@@ -117,7 +117,7 @@ const pagination = ref({
 const { t } = useI18n()
 
 const loadSavedAuth = () => {
-  const saved = localStorage.getItem('guest_order_auth')
+  const saved = sessionStorage.getItem('guest_order_auth')
   let parsed: Record<string, unknown> = {}
   try {
     parsed = saved ? JSON.parse(saved) : {}
@@ -139,12 +139,12 @@ const persistAuth = () => {
     email: email.value,
     order_password: orderPassword.value,
   }
-  localStorage.setItem('guest_order_auth', JSON.stringify(payload))
+  sessionStorage.setItem('guest_order_auth', JSON.stringify(payload))
   savedAuth.value = payload
 }
 
 const clearSaved = () => {
-  localStorage.removeItem('guest_order_auth')
+  sessionStorage.removeItem('guest_order_auth')
   savedAuth.value = { email: '', order_password: '' }
   email.value = ''
   orderPassword.value = ''

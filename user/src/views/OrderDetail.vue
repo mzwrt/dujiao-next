@@ -37,7 +37,7 @@
               <span class="theme-badge px-3 py-1 text-xs font-medium" :class="statusClass(order.status)">
                 {{ statusLabel(order.status) }}
               </span>
-              <router-link v-if="order.status === 'pending_payment'" :to="`/pay?order_no=${order.order_no}`"
+              <router-link v-if="order.status === 'pending_payment'" :to="`/pay?order_no=${encodeURIComponent(order.order_no)}`"
                 class="px-4 py-2 rounded-lg theme-btn-primary font-bold text-sm">
                 {{ t('orderDetail.payNow') }}
               </router-link>

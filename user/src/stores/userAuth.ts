@@ -71,8 +71,12 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         try {
             const response = await userAuthAPI.login(payload)
             const { token: accessToken, user: userData } = response.data.data
-            setToken(accessToken)
-            setUser(userData)
+            if (accessToken) {
+                setToken(accessToken)
+            }
+            if (userData) {
+                setUser(userData)
+            }
             return true
         } finally {
             loading.value = false
@@ -84,8 +88,12 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         try {
             const response = await userAuthAPI.telegramLogin(payload)
             const { token: accessToken, user: userData } = response.data.data
-            setToken(accessToken)
-            setUser(userData)
+            if (accessToken) {
+                setToken(accessToken)
+            }
+            if (userData) {
+                setUser(userData)
+            }
             return true
         } finally {
             loading.value = false
