@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/mzwrt/dujiao-next/internal/logger"
 
@@ -19,18 +18,12 @@ func InitDefaultAdmin(username, password string) error {
 		return fmt.Errorf("count admins failed: %w", err)
 	}
 
-	// 如果已有管理员，确保默认 admin 拥有超级管理员权限
+	// 已有管理员时直接跳过，不做任何自动提权。
+	// Security: auto-promoting any account (even the literal "admin" username) to
+	// is_super=true on every restart creates a privilege-escalation path: an
+	// intentional demotion performed through the admin interface is silently undone
+	// after the next restart. Super-admin status must only be set via the admin UI.
 	if count > 0 {
-		if err := DB.Model(&Admin{}).Where("username = ?", "admin").Update("is_super", true).Error; err != nil {
-			logger.Warnw("ensure_default_admin_super_failed", "error", err)
-		}
-		// 注意：不对 bootstrap 配置中的自定义用户名做自动提权。
-		// 每次重启时从配置文件自动将任意用户名提升为超管，会让拥有配置文件写权限的人
-		// 绕过数据库 RBAC 控制实施权限提升攻击，或使已被降权的账号在重启后恢复超管权限。
-		// Security: do NOT auto-promote the configured bootstrap username to super admin
-		// on every restart. Doing so would allow anyone with config file write access to
-		// escalate any account to super admin, bypassing the database RBAC controls, and
-		// would silently undo intentional demotions after a server restart.
 		return nil
 	}
 
@@ -74,13 +67,9 @@ func InitDefaultAdmin(username, password string) error {
 }
 
 // printGeneratedCredentials 将生成的凭据输出到 stderr，确保用户在终端和 docker logs 中都能看到。
-// PCI-DSS 8.2.1 — 仅显示密码前 4 位，提示用户查看完整密码的安全方式已不适用；
-// 出于首次部署可用性，完整密码仅在此处打印一次，日志中不再记录。
+// 完整密码仅此处打印一次，不记录到结构化日志文件中（避免日志归档后凭据泄露）。
+// 部署者应在首次登录后立即修改密码。
 func printGeneratedCredentials(username, password string) {
-	masked := strings.Repeat("*", len(password))
-	if len(password) > 4 {
-		masked = password[:4] + strings.Repeat("*", len(password)-4)
-	}
 	const banner = `
 ╔══════════════════════════════════════════════════════════════╗
 ║           ⚠️  默认管理员账号已自动创建                        ║
@@ -95,7 +84,7 @@ func printGeneratedCredentials(username, password string) {
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
 `
-	fmt.Fprintf(os.Stderr, banner, username, masked)
+	fmt.Fprintf(os.Stderr, banner, username, password)
 }
 
 func generateRandomPassword(length int) (string, error) {
