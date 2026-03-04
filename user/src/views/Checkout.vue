@@ -924,7 +924,7 @@ const handleSubmit = async () => {
       captcha_payload: getGuestCaptchaPayload(),
     })
 
-    localStorage.setItem('guest_order_auth', JSON.stringify({
+    sessionStorage.setItem('guest_order_auth', JSON.stringify({
       email: guestEmail.value.trim(),
       order_password: guestPassword.value,
     }))

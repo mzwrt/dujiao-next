@@ -64,7 +64,7 @@
               <span class="theme-badge px-3 py-1 text-xs font-medium" :class="statusClass(order.status)">
                 {{ statusLabel(order.status) }}
               </span>
-              <router-link v-if="order.status === 'pending_payment'" :to="`/pay?guest=1&order_no=${order.order_no}`"
+              <router-link v-if="order.status === 'pending_payment'" :to="`/pay?guest=1&order_no=${encodeURIComponent(order.order_no)}`"
                 class="px-4 py-2 rounded-lg theme-btn-primary font-bold text-sm">
                 {{ t('orders.payNow') }}
               </router-link>
@@ -340,7 +340,7 @@ const showTimeCard = computed(() => {
 })
 
 const loadSavedAuth = () => {
-  const saved = localStorage.getItem('guest_order_auth')
+  const saved = sessionStorage.getItem('guest_order_auth')
   let savedAuth: Record<string, unknown> = {}
   try {
     savedAuth = saved ? JSON.parse(saved) : {}
@@ -372,7 +372,10 @@ const loadOrder = async () => {
     authError.value = ''
   } catch (error) {
     order.value = null
-    authError.value = t('guestOrderDetail.authInvalid')
+    const isBusinessError = error != null && typeof error === 'object' && 'silentBusinessError' in (error as object)
+    authError.value = isBusinessError
+      ? t('guestOrderDetail.authInvalid')
+      : (error instanceof Error ? error.message : t('guestOrderDetail.authInvalid'))
   } finally {
     loading.value = false
   }
@@ -494,7 +497,7 @@ onMounted(() => {
 })
 
 const persistAuth = () => {
-  localStorage.setItem('guest_order_auth', JSON.stringify({
+  sessionStorage.setItem('guest_order_auth', JSON.stringify({
     email: auth.value.email,
     order_password: auth.value.order_password,
   }))
@@ -511,7 +514,7 @@ const handleAuthSubmit = async () => {
 }
 
 const clearAuth = () => {
-  localStorage.removeItem('guest_order_auth')
+  sessionStorage.removeItem('guest_order_auth')
   auth.value = { email: '', order_password: '' }
   order.value = null
   authError.value = t('guestOrderDetail.authRequired')

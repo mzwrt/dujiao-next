@@ -416,20 +416,28 @@ const handleSubmit = async () => {
     sort_order: form.sort_order,
   }
 
-  if (isEditing.value && editingId.value) {
-    await adminAPI.updatePaymentChannel(editingId.value, payload)
-  } else {
-    await adminAPI.createPaymentChannel(payload)
+  try {
+    if (isEditing.value && editingId.value) {
+      await adminAPI.updatePaymentChannel(editingId.value, payload)
+    } else {
+      await adminAPI.createPaymentChannel(payload)
+    }
+    closeModal()
+    fetchChannels(pagination.value.page)
+  } catch (err) {
+    // notifyError is already called by the API interceptor
   }
-  closeModal()
-  fetchChannels(pagination.value.page)
 }
 
 const handleDelete = async (channel: any) => {
   const confirmed = await confirmAction({ description: t('admin.paymentChannels.confirmDelete', { name: channel.name }), confirmText: t('admin.common.delete'), variant: 'destructive' })
   if (!confirmed) return
-  await adminAPI.deletePaymentChannel(channel.id)
-  fetchChannels(pagination.value.page)
+  try {
+    await adminAPI.deletePaymentChannel(channel.id)
+    fetchChannels(pagination.value.page)
+  } catch (err) {
+    // notifyError is already called by the API interceptor
+  }
 }
 
 onMounted(() => {
