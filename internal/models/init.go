@@ -19,18 +19,18 @@ func InitDefaultAdmin(username, password string) error {
 		return fmt.Errorf("count admins failed: %w", err)
 	}
 
-	// 如果已有管理员，确保首次初始化的管理员拥有超级管理员权限
+	// 如果已有管理员，确保默认 admin 拥有超级管理员权限
 	if count > 0 {
 		if err := DB.Model(&Admin{}).Where("username = ?", "admin").Update("is_super", true).Error; err != nil {
 			logger.Warnw("ensure_default_admin_super_failed", "error", err)
 		}
-		// 如果配置了自定义用户名，同样确保其拥有超级管理员权限（修复非 "admin" 用户名场景）
-		trimmedUsername := strings.TrimSpace(username)
-		if trimmedUsername != "" && !strings.EqualFold(trimmedUsername, "admin") {
-			if err := DB.Model(&Admin{}).Where("username = ?", trimmedUsername).Update("is_super", true).Error; err != nil {
-				logger.Warnw("ensure_custom_admin_super_failed", "username", trimmedUsername, "error", err)
-			}
-		}
+		// 注意：不对 bootstrap 配置中的自定义用户名做自动提权。
+		// 每次重启时从配置文件自动将任意用户名提升为超管，会让拥有配置文件写权限的人
+		// 绕过数据库 RBAC 控制实施权限提升攻击，或使已被降权的账号在重启后恢复超管权限。
+		// Security: do NOT auto-promote the configured bootstrap username to super admin
+		// on every restart. Doing so would allow anyone with config file write access to
+		// escalate any account to super admin, bypassing the database RBAC controls, and
+		// would silently undo intentional demotions after a server restart.
 		return nil
 	}
 
