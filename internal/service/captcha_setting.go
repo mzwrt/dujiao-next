@@ -9,7 +9,10 @@ import (
 	"github.com/mzwrt/dujiao-next/internal/models"
 )
 
-// CaptchaSceneSetting 验证码场景配置
+// defaultTurnstileVerifyURL is the official Cloudflare Turnstile server-side verification endpoint.
+// PCI-DSS 6.5.9 — Only HTTPS endpoints are permitted to prevent SSRF and credential exposure.
+const defaultTurnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
 // 注意：仅维护业务约定的 5 个场景
 // login 场景同时作用于前台用户登录与后台管理员登录
 // 其余场景分别对应注册发码、找回发码、游客下单、礼品卡兑换
@@ -154,7 +157,11 @@ func NormalizeCaptchaSetting(setting CaptchaSetting) CaptchaSetting {
 	setting.Turnstile.SecretKey = strings.TrimSpace(setting.Turnstile.SecretKey)
 	setting.Turnstile.VerifyURL = strings.TrimSpace(setting.Turnstile.VerifyURL)
 	if setting.Turnstile.VerifyURL == "" {
-		setting.Turnstile.VerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+		setting.Turnstile.VerifyURL = defaultTurnstileVerifyURL
+	}
+	// PCI-DSS 6.5.9 — 防止 SSRF：Turnstile 验证端点必须使用 HTTPS，禁止将流量重定向到内网地址。
+	if !strings.HasPrefix(setting.Turnstile.VerifyURL, "https://") {
+		setting.Turnstile.VerifyURL = defaultTurnstileVerifyURL
 	}
 	if setting.Turnstile.TimeoutMS <= 0 {
 		setting.Turnstile.TimeoutMS = 2000
