@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mzwrt/dujiao-next/internal/constants"
 	"github.com/mzwrt/dujiao-next/internal/models"
@@ -29,6 +30,26 @@ type RecordUserLoginInput struct {
 	UserAgent   string
 	LoginSource string
 	RequestID   string
+}
+
+// maxUserAgentBytes is the maximum byte length stored for User-Agent values.
+// Limiting to 512 bytes prevents storage-exhaustion DoS while preserving enough
+// information for audit purposes (CIS Control 4.1 / PCI-DSS 6.5.10).
+const maxUserAgentBytes = 512
+
+// truncateUserAgent trims and truncates a User-Agent string to maxUserAgentBytes,
+// ensuring the result is valid UTF-8 by not splitting multi-byte sequences.
+func truncateUserAgent(ua string) string {
+	ua = strings.TrimSpace(ua)
+	if len(ua) <= maxUserAgentBytes {
+		return ua
+	}
+	// Walk backwards from the limit to find a valid UTF-8 rune boundary.
+	end := maxUserAgentBytes
+	for end > 0 && !utf8.Valid([]byte(ua[:end])) {
+		end--
+	}
+	return ua[:end]
 }
 
 // Record 记录登录行为
@@ -66,7 +87,7 @@ func (s *UserLoginLogService) Record(input RecordUserLoginInput) error {
 		Status:      status,
 		FailReason:  failReason,
 		ClientIP:    strings.TrimSpace(input.ClientIP),
-		UserAgent:   strings.TrimSpace(input.UserAgent),
+		UserAgent:   truncateUserAgent(input.UserAgent),
 		LoginSource: source,
 		RequestID:   strings.TrimSpace(input.RequestID),
 		CreatedAt:   now,

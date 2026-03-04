@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -88,12 +89,48 @@ func (h *Handler) GetSitemap(c *gin.Context) {
 }
 
 // resolveBaseURL builds the site's base URL from the request.
+// Scheme is validated to only allow "http" or "https" (prevents scheme injection via
+// X-Forwarded-Proto). Host is sanitized to strip any path/query/fragment components
+// and control characters (CWE-113 / CIS 5.1 — Host header injection).
 func resolveBaseURL(c *gin.Context) string {
 	scheme := "https"
-	if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
-		scheme = proto
-	} else if c.Request.TLS == nil {
+	proto := strings.ToLower(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")))
+	switch proto {
+	case "http":
 		scheme = "http"
+	case "https":
+		scheme = "https"
+	default:
+		// Unknown or empty proto — fall back based on actual TLS state.
+		if c.Request.TLS == nil {
+			scheme = "http"
+		}
 	}
-	return fmt.Sprintf("%s://%s", scheme, c.Request.Host)
+	return fmt.Sprintf("%s://%s", scheme, sanitizeSitemapHost(c.Request.Host))
+}
+
+// sanitizeSitemapHost removes path, query, and fragment components from a Host
+// header value and truncates at the first CRLF to prevent header injection.
+// Only valid hostname characters are kept (allowlist) to prevent injection via
+// Unicode or C1 control characters (CWE-113 / PCI-DSS 6.5.1).
+// Valid characters: alphanumeric, hyphen, dot (hostname), colon (port separator),
+// and square brackets (IPv6 address literals).
+func sanitizeSitemapHost(host string) string {
+	// Truncate at the first CR or LF to prevent CRLF header-injection attacks.
+	if i := strings.IndexAny(host, "\r\n"); i >= 0 {
+		host = host[:i]
+	}
+	// Strip any path, query, or fragment that an attacker appended to the Host value.
+	if i := strings.IndexAny(host, "/?#"); i >= 0 {
+		host = host[:i]
+	}
+	// Allowlist: keep only characters valid in a hostname[:port] or IPv6 literal.
+	host = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '-' || r == '.' || r == ':' || r == '[' || r == ']' {
+			return r
+		}
+		return -1
+	}, host)
+	return host
 }
