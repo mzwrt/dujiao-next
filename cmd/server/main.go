@@ -42,10 +42,10 @@ func main() {
 		}
 		// PCI-DSS 4.1 — release 模式下 TLS 证书验证不应被跳过
 		if cfg.Redis.TLSEnabled && cfg.Redis.TLSSkipVerify {
-			stdLog.Printf("警告: Redis TLS 已启用但证书验证被跳过 (redis.tls_skip_verify=true)，生产环境应使用有效证书")
+			stdLog.Fatalf("Redis TLS 已启用但证书验证被跳过 (redis.tls_skip_verify=true)，PCI-DSS 4.1 要求生产环境使用有效证书，请修复配置后重启")
 		}
 		if cfg.Queue.TLSEnabled && cfg.Queue.TLSSkipVerify {
-			stdLog.Printf("警告: Queue TLS 已启用但证书验证被跳过 (queue.tls_skip_verify=true)，生产环境应使用有效证书")
+			stdLog.Fatalf("Queue TLS 已启用但证书验证被跳过 (queue.tls_skip_verify=true)，PCI-DSS 4.1 要求生产环境使用有效证书，请修复配置后重启")
 		}
 	} else {
 		if isWeakSecret(cfg.JWT.SecretKey) {
