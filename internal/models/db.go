@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -34,8 +35,9 @@ func InitDB(driver, dsn string, pool DBPoolConfig) error {
 	return InitDBWithMode(driver, dsn, pool, "")
 }
 
-// InitDBWithMode 初始化数据库连接（支持根据运行模式调整日志级别）
-// PCI-DSS 10.2 — 生产环境仅记录 Warn 及以上级别，避免 SQL 查询泄露敏感数据。
+// InitDBWithMode 初始化数据库连接（支持根据运行模式调整着色等外观）
+// PCI-DSS 10.2 — 所有模式均使用 Warn 级别，避免 SQL 查询泄露敏感数据；IgnoreRecordNotFoundError
+// 防止可选配置键（如 smtp_config）不存在时产生误导性错误日志。
 func InitDBWithMode(driver, dsn string, pool DBPoolConfig, mode string) error {
 	var err error
 	normalized := strings.ToLower(strings.TrimSpace(driver))
@@ -51,12 +53,20 @@ func InitDBWithMode(driver, dsn string, pool DBPoolConfig, mode string) error {
 	default:
 		return fmt.Errorf("unsupported database driver: %s", driver)
 	}
-	logMode := logger.Info
-	if strings.EqualFold(strings.TrimSpace(mode), "release") {
-		logMode = logger.Warn
-	}
+	// PCI-DSS 10.2 — 仅记录 Warn 及以上级别，避免 SQL 查询泄露敏感数据；
+	// IgnoreRecordNotFoundError 避免可选配置（如 smtp_config）查询不到时产生误导性错误日志。
+	isRelease := strings.EqualFold(strings.TrimSpace(mode), "release")
+	logMode := logger.Warn
 	DB, err = gorm.Open(dialector, &gorm.Config{
-		Logger: logger.Default.LogMode(logMode),
+		Logger: logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logMode,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  !isRelease,
+			},
+		),
 	})
 	if err != nil {
 		return err
