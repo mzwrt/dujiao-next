@@ -56,7 +56,7 @@ func main() {
 		}
 	}
 
-	// 初始化数据库 (PCI-DSS 10.2 — 生产模式使用 Warn 级别 SQL 日志)
+	// 初始化数据库 (PCI-DSS 10.2 — 使用 Warn 级别 SQL 日志，忽略预期的 ErrRecordNotFound)
 	if err := models.InitDBWithMode(cfg.Database.Driver, cfg.Database.DSN, models.DBPoolConfig{
 		MaxOpenConns:           cfg.Database.Pool.MaxOpenConns,
 		MaxIdleConns:           cfg.Database.Pool.MaxIdleConns,
